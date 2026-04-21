@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Good Hamburger - Teste Técnico
 
 Olá! Este projeto é um sistema de pedidos para uma lanchonete, desenvolvido como parte de um teste técnico. O objetivo principal foi entregar uma aplicação funcional, segura e que seja bem fácil de rodar para quem for avaliar.
