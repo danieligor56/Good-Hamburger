@@ -1,0 +1,43 @@
+services:
+  api:
+    image: good-hamburger-api
+    build:
+      context: ./GoodHamburger.Api
+      dockerfile: Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=db;Database=good_hamburger_db;Username=postgres;Password=secret
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: good-hamburger-web
+    build:
+      context: ./GoodHamburger.Web
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=good_hamburger_db
+    # Removido 'ports' para isolamento de rede: o banco só ouve dentro do Docker
+    volumes:
+      - good_hamburger_pg_data_v2:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d good_hamburger_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  good_hamburger_pg_data_v2:

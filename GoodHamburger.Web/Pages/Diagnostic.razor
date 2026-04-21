@@ -1,0 +1,246 @@
+@page "/diagnostic"
+@using GoodHamburger.Web.Models
+@using System.Text.Json
+@inject HttpClient Http
+
+<PageTitle>Good Hamburger - Diagnóstico</PageTitle>
+
+<div class="container mt-4">
+    <div class="header-section text-center mb-4">
+        <h1 class="display-5 fw-bold text-dark">🛠️ Check-up do Sistema</h1>
+        <p class="text-muted">Ferramenta de validação de integridade, segurança e regras de negócio.</p>
+    </div>
+
+    <div class="row">
+        <!-- Controles -->
+        <div class="col-md-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">Controles de Teste</h5>
+                    <button class="btn btn-primary w-100 mb-3 py-2 fw-bold" @onclick="RunDiagnostic" disabled="@isExecuting">
+                        @if(isExecuting) {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                            <span>Executando...</span>
+                        } else {
+                            <span>🚀 Iniciar Diagnóstico</span>
+                        }
+                    </button>
+                    <button class="btn btn-outline-secondary w-100" @onclick="ClearLogs">
+                        🧹 Limpar Console
+                    </button>
+                    
+                    <hr />
+                    
+                    <div class="status-summary">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Conectividade:</span>
+                            <span class="badge @GetStatusClass(connStatus)">@connStatus</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Regras (Desconto):</span>
+                            <span class="badge @GetStatusClass(ruleStatus)">@ruleStatus</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Segurança (Rate Limit):</span>
+                            <span class="badge @GetStatusClass(secStatus)">@secStatus</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terminal Log -->
+        <div class="col-md-8">
+            <div class="terminal-window shadow-lg">
+                <div class="terminal-header">
+                    <div class="terminal-buttons">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
+                    </div>
+                    <div class="terminal-title">system_diagnostic_logs.txt</div>
+                </div>
+                <div class="terminal-body" id="terminal-body">
+                    @if (!logs.Any())
+                    {
+                        <div class="text-muted">Aguardando início dos testes...</div>
+                    }
+                    else
+                    {
+                        @foreach (var log in logs)
+                        {
+                            <div class="log-entry">
+                                <span class="log-time">[@DateTime.Now.ToString("HH:mm:ss")]</span>
+                                <span class="@GetLogColorClass(log.Type)">@log.Message</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .terminal-window {
+        background-color: #1e1e1e;
+        border-radius: 8px;
+        overflow: hidden;
+        font-family: 'Consolas', 'Monaco', monospace;
+        height: 500px;
+        display: flex;
+        flex-direction: column;
+    }
+    .terminal-header {
+        background-color: #333;
+        padding: 8px 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .terminal-buttons {
+        display: flex;
+        gap: 6px;
+    }
+    .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+    .red { background-color: #ff5f56; }
+    .yellow { background-color: #ffbd2e; }
+    .green { background-color: #27c93f; }
+    .terminal-title {
+        color: #aaa;
+        font-size: 0.8rem;
+    }
+    .terminal-body {
+        padding: 15px;
+        color: #d4d4d4;
+        overflow-y: auto;
+        flex-grow: 1;
+        font-size: 0.9rem;
+    }
+    .log-time { color: #888; margin-right: 10px; }
+    .log-info { color: #4fc1ff; }
+    .log-success { color: #b5cea8; }
+    .log-warning { color: #ce9178; }
+    .log-error { color: #f44747; font-weight: bold; }
+    .log-entry { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
+</style>
+
+@code {
+    private List<LogEntry> logs = new();
+    private bool isExecuting = false;
+    private string connStatus = "PENDENTE";
+    private string ruleStatus = "PENDENTE";
+    private string secStatus = "PENDENTE";
+
+    private async Task RunDiagnostic()
+    {
+        isExecuting = true;
+        ClearLogs();
+        
+        Log("Iniciando bateria de testes diagnóstico...", LogType.Info);
+        
+        // --- TESTE 1: Conectividade ---
+        Log("TESTE 1: Validando conectividade com API e Banco...", LogType.Info);
+        try {
+            var menu = await Http.GetFromJsonAsync<List<Food>>("api/menu");
+            if (menu?.Any() == true) {
+                Log($"Sucesso! {menu.Count} itens encontrados no cardápio.", LogType.Success);
+                connStatus = "OK";
+            } else {
+                Log("Aviso: API respondeu mas o cardápio está vazio.", LogType.Warning);
+                connStatus = "AVISO";
+            }
+        } catch (Exception ex) {
+            Log($"ERRO DE CONEXÃO: {ex.Message}", LogType.Error);
+            connStatus = "FALHA";
+            isExecuting = false;
+            return;
+        }
+
+        // --- TESTE 2: Regras de Desconto (Combo Completo) ---
+        Log("TESTE 2: Validando Motor de Descontos (Regra 20% - Combo)...", LogType.Info);
+        try {
+            // IDs baseados no seed (1: Burger, 4: Batata, 5: Refri)
+            var request = new OrderRequestDto { FoodIds = new List<int> { 1, 4, 5 } };
+            var response = await Http.PostAsJsonAsync("api/order", request);
+            var result = await response.Content.ReadFromJsonAsync<Order>();
+            
+            if (result != null && result.DiscountAmount > 0) {
+                Log($"Check: Subtotal {result.Subtotal:C2}, Desconto {result.DiscountAmount:C2} ({result.DiscountDescription})", LogType.Success);
+                Log("Motor de Descontos validado com sucesso.", LogType.Success);
+                ruleStatus = "OK";
+            } else {
+                Log("Falha: Desconto não foi aplicado ao combo completo.", LogType.Error);
+                ruleStatus = "FALHA";
+            }
+        } catch (Exception ex) {
+            Log($"ERRO NA REGRA: {ex.Message}", LogType.Error);
+            ruleStatus = "FALHA";
+        }
+
+        // --- TESTE 3: Regra de Segurança (Duplicidade) ---
+        Log("TESTE 3: Validando Segurança contra itens duplicados...", LogType.Info);
+        try {
+            var badRequest = new OrderRequestDto { FoodIds = new List<int> { 1, 2 } }; // Dois sanduíches
+            var response = await Http.PostAsJsonAsync("api/order", badRequest);
+            
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest) {
+                Log("Sucesso: API bloqueou pedido duplicado (400 Bad Request).", LogType.Success);
+            } else {
+                Log($"Falha: API permitiu pedido duplicado (Status: {response.StatusCode}).", LogType.Error);
+            }
+        } catch (Exception ex) {
+            Log($"ERRO NO TESTE: {ex.Message}", LogType.Error);
+        }
+
+        // --- TESTE 4: Proteção DDoS (Rate Limiting) ---
+        Log("TESTE 4: Validando Proteção Anti-DDoS (Rate Limiting)...", LogType.Info);
+        Log("Disparando 40 requisições simultâneas para forçar o limite...", LogType.Warning);
+        
+        int blockCount = 0;
+        var tasks = new List<Task<HttpResponseMessage>>();
+        for (int i = 0; i < 40; i++) {
+            tasks.Add(Http.GetAsync("api/menu"));
+        }
+        
+        var responses = await Task.WhenAll(tasks);
+        foreach (var r in responses) {
+            if (r.StatusCode == (System.Net.HttpStatusCode)429) blockCount++;
+        }
+
+        if (blockCount > 0) {
+            Log($"Sucesso! O Rate Limiter barrou {blockCount} requisições excessivas (429 Too Many Requests).", LogType.Success);
+            secStatus = "OK";
+        } else {
+            Log("Aviso: O Rate Limiter não barrou as requisições (Limite de 30/min pode não ter sido atingido ou cache local).", LogType.Warning);
+            secStatus = "AVISO/OFF";
+        }
+
+        Log("Diagnóstico concluído.", LogType.Info);
+        isExecuting = false;
+    }
+
+    private void Log(string message, LogType type) => logs.Add(new LogEntry(message, type));
+    private void ClearLogs() => logs.Clear();
+
+    private string GetStatusClass(string status) => status switch {
+        "OK" => "bg-success text-white",
+        "FALHA" => "bg-danger text-white",
+        "AVISO" => "bg-warning text-dark",
+        _ => "bg-secondary text-white"
+    };
+
+    private string GetLogColorClass(LogType type) => type switch {
+        LogType.Success => "log-success",
+        LogType.Error => "log-error",
+        LogType.Warning => "log-warning",
+        _ => "log-info"
+    };
+
+    public record LogEntry(string Message, LogType Type);
+    public enum LogType { Info, Success, Warning, Error }
+}

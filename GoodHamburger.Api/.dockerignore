@@ -1,0 +1,12 @@
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/out
+**/*.user
+**/*.lock.json
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+postgres_data
