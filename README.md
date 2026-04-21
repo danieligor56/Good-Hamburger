@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Good Hamburger - Teste Técnico
 
 Olá! Este projeto é um sistema de pedidos para uma lanchonete, desenvolvido como parte de um teste técnico. O objetivo principal foi entregar uma aplicação funcional, segura e que seja bem fácil de rodar para quem for avaliar.
@@ -39,3 +40,7 @@ dotnet test
 
 ---
 **Daniel Igor**
+=======
+# Good-Hamburger
+Sistema para lanchonete, desenvolvido como parte de um teste técnico, com foco em organização de código, escalabilidade, segurança e facilidade de execução
+>>>>>>> 82eaa3bd164f1bf4bdc63eb81df8bc92aa4848a9
